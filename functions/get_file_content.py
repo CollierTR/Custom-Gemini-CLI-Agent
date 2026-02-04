@@ -1,4 +1,6 @@
+from google.genai import types
 import os
+
 
 def get_file_content(working_directory, file_path):
     try:
@@ -21,3 +23,20 @@ def get_file_content(working_directory, file_path):
         return content
     except Exception as e:
         return f"Error: {e}"
+
+
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Gets the utf-8 content from a file if it exists",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="File path for the file you want to read from",
+            ),
+        },
+        required=["file_path"],
+    ),
+)
+
