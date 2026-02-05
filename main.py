@@ -20,47 +20,65 @@ parser.add_argument("--verbose", action="store_true", help="Enable verbose outpu
 args = parser.parse_args()
 
 messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
-response = client.models.generate_content(
-    model="gemini-2.5-flash", 
-    contents=messages,
-    config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
-)
 
-if response.usage_metadata == None:
-    raise RuntimeError("Some ill thing has befallen us...")
+def ai_run_loop():
+    response = client.models.generate_content(
+        model="gemini-2.5-flash", 
+        contents=messages,
+        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
+    )
 
-if args.verbose:
-    print(" ")
-    print("--------------------------------")
-    print("User prompt: ", args.user_prompt)
-    print("Prompt tokens: ", response.usage_metadata.prompt_token_count)
-    print("Response tokens: ", response.usage_metadata.candidates_token_count)
-    print("--------------------------------")
-    print(" ")
+    if response.candidates:
+        messages.append(response.candidates[0].content)
 
-if response.function_calls:
-    print("--------------------------------")
+    if response.usage_metadata == None:
+        raise RuntimeError("Some ill thing has befallen us...")
 
-    function_results = []
+    if args.verbose:
+        print(" ")
+        print("--------------------------------")
+        print("User prompt: ", args.user_prompt)
+        print("Prompt tokens: ", response.usage_metadata.prompt_token_count)
+        print("Response tokens: ", response.usage_metadata.candidates_token_count)
+        print("--------------------------------")
+        print(" ")
 
-    for function_call in response.function_calls:
-        print(f"Calling function: {function_call.name}({function_call.args})")
-        function_call_result = call_function(function_call)
+    if response.function_calls:
+        print("--------------------------------")
 
-        # validation
-        if not function_call_result.parts:
-            raise Exception("Error: function_call_result does not have PARTS property")
-        if not function_call_result.parts[0].function_response:
-            raise Exception("Error: No function_response object found")
-        if not function_call_result.parts[0].function_response.response:
-            raise Exception("Error: No function_response found")
+        function_results = []
 
-        if args.verbose:
-            print(f"-> {function_call_result.parts[0].function_response.response}")
-        
-        function_results.append(function_call_result.parts[0])
+        for function_call in response.function_calls:
+            print(f"Calling function: {function_call.name}({function_call.args})")
+            function_call_result = call_function(function_call)
 
-    print("--------------------------------")
-    print(" ")
+            # validation
+            if not function_call_result.parts:
+                raise Exception("Error: function_call_result does not have PARTS property")
+            if not function_call_result.parts[0].function_response:
+                raise Exception("Error: No function_response object found")
+            if not function_call_result.parts[0].function_response.response:
+                raise Exception("Error: No function_response found")
+
+            if args.verbose:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
+            
+            function_results.append(function_call_result.parts[0])
+
+            messages.append(types.Content(role="user", parts=function_results))
+
+        print("--------------------------------")
+        print(" ")
+        return False
+    else:
+        print(response.text)
+        return True
+
+
+# run the main AI loop
+for _ in range(20):
+    done = ai_run_loop()
+    if done:
+        break
 else:
-    print(response.text)
+    raise RuntimeError("AI loop exceeded allowance")
