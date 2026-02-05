@@ -4,7 +4,7 @@ import argparse
 from google import genai
 from google.genai import types
 from prompts import system_prompt
-from call_function import available_functions
+from call_function import available_functions, call_function
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -40,8 +40,26 @@ if args.verbose:
 
 if response.function_calls:
     print("--------------------------------")
+
+    function_results = []
+
     for function_call in response.function_calls:
         print(f"Calling function: {function_call.name}({function_call.args})")
+        function_call_result = call_function(function_call)
+
+        # validation
+        if not function_call_result.parts:
+            raise Exception("Error: function_call_result does not have PARTS property")
+        if not function_call_result.parts[0].function_response:
+            raise Exception("Error: No function_response object found")
+        if not function_call_result.parts[0].function_response.response:
+            raise Exception("Error: No function_response found")
+
+        if args.verbose:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+        
+        function_results.append(function_call_result.parts[0])
+
     print("--------------------------------")
     print(" ")
 else:
